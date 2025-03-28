@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Callable, List, Literal, Optional, Sequence, Union
 
 import boto3
+from botocore.config import Config
 from pydantic import StrictStr
 from tqdm import tqdm
 
@@ -31,6 +32,7 @@ from feast.utils import _get_column_names
 from feast.version import get_version
 
 DEFAULT_BATCH_SIZE = 10_000
+DEFAULT_TIMEOUT = 600
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +97,7 @@ class LambdaMaterializationEngine(BatchMaterializationEngine):
             PackageType="Image",
             Role=self.repo_config.batch_engine.lambda_role,
             Code={"ImageUri": self.repo_config.batch_engine.materialization_image},
-            Timeout=600,
+            Timeout=DEFAULT_TIMEOUT,
             Tags={
                 "feast-owned": "True",
                 "project": project,
@@ -147,7 +149,8 @@ class LambdaMaterializationEngine(BatchMaterializationEngine):
         self.lambda_name = f"feast-materialize-{self.repo_config.project}"
         if len(self.lambda_name) > 64:
             self.lambda_name = self.lambda_name[:64]
-        self.lambda_client = boto3.client("lambda")
+        config = Config(read_timeout=DEFAULT_TIMEOUT + 10)
+        self.lambda_client = boto3.client("lambda", config=config)
 
     def materialize(
         self, registry, tasks: List[MaterializationTask]
